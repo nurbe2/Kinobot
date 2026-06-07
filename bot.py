@@ -5,28 +5,15 @@ import time
 import os
 from flask import Flask, request
 
-# Bot tokenini Render environment variable dan olish
+# ========== SOZLAMALAR ==========
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '8306639956'))
 CHANNEL_USERNAME = os.environ.get('CHANNEL_USERNAME', '@Vexron_stars')
+PORT = int(os.environ.get('PORT', 5000))
+TOLOV_SUMMASI = "14.000 so'm"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode='HTML')
-
-# Flask server
 app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "🤖 Bot ishlamoqda!"
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return 'OK', 200
-    return 'Bad Request', 403
 
 # SQLite baza
 conn = sqlite3.connect('kino_bot.db', check_same_thread=False)
@@ -57,7 +44,20 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS pro_users (
 conn.commit()
 
 user_states = {}
-TOLOV_SUMMASI = "14.000 so'm"
+
+# ========== FLASK ROUTES ==========
+@app.route('/')
+def home():
+    return "🤖 Bot ishlamoqda!"
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return 'OK', 200
+    return 'Bad Request', 403
 
 # ========== OBUNA TEKSHIRISH ==========
 def check_sub(user_id):
@@ -69,8 +69,7 @@ def check_sub(user_id):
 
 def is_pro(user_id):
     cursor.execute("SELECT pro_until FROM pro_users WHERE user_id=?", (user_id,))
-    result = cursor.fetchone()
-    return result is not None
+    return cursor.fetchone() is not None
 
 # ========== START ==========
 @bot.message_handler(commands=['start'])
@@ -503,16 +502,10 @@ def nexmovie_pro(call):
         return
     
     markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(types.InlineKeyboardButton(
-        "💳 To'lov qildim ✅",
-        callback_data="payment_done"
-    ))
-    markup.add(types.InlineKeyboardButton(
-        "◀️ Orqaga",
-        callback_data="back_to_menu"
-    ))
+    markup.add(types.InlineKeyboardButton("💳 To'lov qildim ✅", callback_data="payment_done"))
+    markup.add(types.InlineKeyboardButton("◀️ Orqaga", callback_data="back_to_menu"))
     
-    text = (
+    bot.edit_message_text(
         "💎 <b>NexMovie Pro</b> 💎\n\n"
         "🔥 <b>PRO imkoniyatlar:</b>\n"
         "✅ Reklamasiz kinolar\n"
@@ -523,12 +516,10 @@ def nexmovie_pro(call):
         f"💰 <b>To'lov summasi:</b> {TOLOV_SUMMASI}\n\n"
         "💳 <b>VISA karta:</b>\n"
         "<code>4916 9903 1619 3280</code>\n\n"
-        "📌 To'lov qilib, <b>\"To'lov qildim\"</b> tugmasini bosing "
-        "va chek rasmini yuboring.\n\n"
-        "⏰ 24 soat ichida PRO aktivlashtiriladi!"
+        "📌 To'lov qilib, <b>\"To'lov qildim\"</b> tugmasini bosing va chek rasmini yuboring.\n\n"
+        "⏰ 24 soat ichida PRO aktivlashtiriladi!",
+        uid, call.message.message_id, reply_markup=markup
     )
-    
-    bot.edit_message_text(text, uid, call.message.message_id, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda c: c.data == "payment_done")
 def payment_done(call):
@@ -540,7 +531,6 @@ def payment_done(call):
     
     user_states[uid] = {'step': 'waiting_check'}
     bot.answer_callback_query(call.id)
-    
     bot.send_message(uid,
         "📸 <b>To'lov cheki</b>\n\n"
         f"Iltimos, {TOLOV_SUMMASI} to'lov qilganingizni tasdiqlovchi "
@@ -560,4 +550,5 @@ def get_check_photo(msg):
         return
     
     if not msg.photo:
-        bot.send_
+        bot.send_message(uid, "❌ Iltimos, rasm yuboring!")
+        r
