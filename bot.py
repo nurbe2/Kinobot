@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "🎬 NexMovie Bot"
+    return "NexMovie Bot"
 
 @app.route('/ping')
 def ping():
@@ -34,7 +34,7 @@ DATA_FILE = "/tmp/nexmovie.json"
 
 class DB:
     def __init__(self):
-        self.d = {"movies": {}, "users": {}, "comments": {}, "ratings": {}, "pro": []}
+        self.d = {"movies": {}, "users": {}, "comments": {}, "ratings": {}, "pro": [], "payments": []}
         self.load()
     
     def load(self):
@@ -58,6 +58,14 @@ class DB:
             "added": datetime.now().strftime("%Y-%m-%d")
         }
         self.save()
+    
+    def delete_movie(self, code):
+        code = str(code)
+        if code in self.d["movies"]:
+            del self.d["movies"][code]
+            self.save()
+            return True
+        return False
     
     def add_part(self, code, part_num, video_id):
         code = str(code)
@@ -131,6 +139,15 @@ class DB:
         if uid not in self.d.get("pro", []):
             self.d.setdefault("pro", []).append(uid)
             self.save()
+            return True
+        return False
+    
+    def add_payment(self, uid, name):
+        self.d.setdefault("payments", []).append({
+            "uid": str(uid), "name": name,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M")
+        })
+        self.save()
     
     def get_genres(self):
         genres = set()
@@ -168,8 +185,8 @@ def main_menu(uid):
 def admin_kb():
     return ReplyKeyboardMarkup([
         [KeyboardButton("🎬 Kino qo'shish"), KeyboardButton("📹 Qism qo'shish")],
-        [KeyboardButton("📋 Kinolar ro'yxati"), KeyboardButton("📊 Statistika")],
-        [KeyboardButton("🏠 Asosiy menyu")],
+        [KeyboardButton("📋 Kinolar ro'yxati"), KeyboardButton("🗑 Kino o'chirish")],
+        [KeyboardButton("📊 Statistika"), KeyboardButton("🏠 Asosiy menyu")],
     ], resize_keyboard=True)
 
 async def check_sub(uid, context):
@@ -232,11 +249,20 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for code, m in movies.items():
             text += f"🎬 {code} | {m['name']} | ⭐{m['rating']}\n"
         await update.message.reply_text(text)
+    elif txt == "🗑 Kino o'chirish":
+        context.user_data['delete_movie'] = True
+        await update.message.reply_text("🗑 O'chirish uchun kino kodini yuboring:")
     elif txt == "📊 Statistika":
         s = db.get_stats()
         await update.message.reply_text(f"📊 Statistika\n\n👥 Foydalanuvchilar: {s['users']}\n🎬 Kinolar: {s['movies']}\n👁 Ko'rishlar: {s['views']}\n💎 PRO: {s['pro']}\n💬 Fikrlar: {s['comments']}")
     elif txt == "🏠 Asosiy menyu":
         await update.message.reply_text("🏠 Asosiy menyu", reply_markup=ReplyKeyboardMarkup([[KeyboardButton("/start")]], resize_keyboard=True))
+    elif context.user_data.get('delete_movie'):
+        if db.delete_movie(txt):
+            await update.message.reply_text(f"✅ Kino o'chirildi: {txt}", reply_markup=admin_kb())
+        else:
+            await update.message.reply_text("❌ Kino topilmadi!")
+        context.user_data['delete_movie'] = False
     elif context.user_data.get('add_movie'):
         step = context.user_data.get('m_step')
         if step == 'code':
@@ -316,8 +342,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     txt = update.message.text.strip()
     
     if uid == ADMIN_ID:
-        admin_texts = ["🎬 Kino qo'shish", "📹 Qism qo'shish", "📋 Kinolar ro'yxati", "📊 Statistika", "🏠 Asosiy menyu"]
-        if txt in admin_texts or context.user_data.get('add_movie') or context.user_data.get('add_part'):
+        admin_texts = ["🎬 Kino qo'shish", "📹 Qism qo'shish", "📋 Kinolar ro'yxati", "🗑 Kino o'chirish", "📊 Statistika", "🏠 Asosiy menyu"]
+        if txt in admin_texts or context.user_data.get('add_movie') or context.user_data.get('add_part') or context.user_data.get('delete_movie'):
             await handle_admin_text(update, context)
             return
     
@@ -444,7 +470,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     elif d == "stats":
         s = db.get_stats()
-        text = f"📊 Statistika\n\n👥 {s['users']} | 🎬 {s['movies']} | 👁 {s['views']}\n💎 {s['pro']} | 💬 {s['comments']}"
+                text = f"📊 Statistika\n\n👥 {s['users']} | 🎬 {s['movies']} | 👁 {s['views']}\n💎 {s['pro']} | 💬 {s['comments']}"
         kb = [[InlineKeyboardButton("🔙 Orqaga", callback_data="main")]]
         await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     elif d.startswith("mv_"):
@@ -478,8 +504,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         comments = db.get_comments(code)
         if comments:
             text = "💬 Fikrlar:\n\n"
-        for c in comments[-10:]:
-            text += f"👤 {c['name']}: {c['text']}\n📅 {c['date']}\n➖➖➖\n"
+            for c in comments[-10:]:
+                text += f"👤 {c['name']}: {c['text']}\n📅 {c['date']}\n➖➖➖\n"
         else:
             text = "📭 Fikrlar yo'q!"
         kb = [[InlineKeyboardButton("🔙 Orqaga", callback_data=f"mv_{code}")]]
@@ -505,7 +531,8 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo = update.message.photo[-1]
         kb = [[InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"app_{uid}"), InlineKeyboardButton("❌ Bekor", callback_data=f"rej_{uid}")]]
         await context.bot.send_photo(ADMIN_ID, photo.file_id, caption=f"📩 PRO so'rovi\n👤 {update.effective_user.first_name}\n🆔 {uid}\n💰 {PRO_PRICE}", reply_markup=InlineKeyboardMarkup(kb))
-        await update.message.reply_text("✅ Chek yuborildi!")
+        db.add_payment(uid, update.effective_user.first_name)
+        await update.message.reply_text("✅ Chek yuborildi! Admin tasdiqlaydi.")
         context.user_data['buying_pro'] = False
 
 async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -523,6 +550,10 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         await q.edit_message_caption(caption=f"{q.message.caption}\n\n✅ TASDIQLANDI!")
     elif d.startswith("rej_"):
+        try:
+            await context.bot.send_message(int(d.replace("rej_", "")), "❌ To'lov rad etildi.")
+        except:
+            pass
         await q.edit_message_caption(caption=f"{q.message.caption}\n\n❌ RAD ETILDI!")
 
 def main():
