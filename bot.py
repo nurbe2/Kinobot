@@ -25,8 +25,8 @@ def run_flask():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN', 'TOKEN')
-ADMIN_ID = 6242470602
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
+ADMIN_ID = 8306639956
 CHANNEL = '@Vexron_stars'
 PRO_PRICE = "14.000 som"
 CARD = "4916 9903 1619 3280"
