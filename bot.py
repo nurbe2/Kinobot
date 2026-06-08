@@ -469,7 +469,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         movie = db.get_movie(code)
         if movie and part_num in movie.get("parts", {}):
             await q.message.reply_video(movie["parts"][part_num], caption=f"🎬 {movie['name']} - {part_num}-qism")
-                        await q.answer("✅ Tayyor!")
+            await q.answer("✅ Tayyor!")
     elif d.startswith("cm_"):
         context.user_data['commenting'] = d.replace("cm_", "")
         await q.edit_message_text("💬 Fikringizni yozing:")
