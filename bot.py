@@ -185,11 +185,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.effective_user.first_name
     db.d["users"][str(uid)] = {"name": name, "joined": datetime.now().strftime("%Y-%m-%d")}
     db.save()
-    await update.message.reply_text(
-        f"NexMovie Bot\n\nSalom, {name}!\n\n/admin - Admin panel" if uid == ADMIN_ID else f"NexMovie Bot\n\nSalom, {name}!\n\nKino kodini yuboring:",
-        reply_markup=main_menu(uid),
-        parse_mode='HTML'
-    )
+    if uid == ADMIN_ID:
+        text = f"NexMovie Bot\n\nSalom, {name}!\n\n/admin - Admin panel"
+    else:
+        text = f"NexMovie Bot\n\nSalom, {name}!\n\nKino kodini yuboring:"
+    await update.message.reply_text(text, reply_markup=main_menu(uid), parse_mode='HTML')
 
 async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -339,7 +339,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_movie(update, code, movie, uid):
     db.add_view(code)
-    comments = db.get_comments(code)
     user_rating = db.get_user_rating(code, uid)
     
     text = f"{movie['name']}\n\n{movie.get('desc', '')[:200]}\n"
@@ -508,4 +507,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-         
