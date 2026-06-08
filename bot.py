@@ -3,11 +3,13 @@ from telebot import types
 import sqlite3
 import time
 import os
+from datetime import datetime
 
 # Sozlamalar
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '8306639956'))
 CHANNEL_USERNAME = os.environ.get('CHANNEL_USERNAME', '@Vexron_stars')
+KINO_CHANNEL = os.environ.get('KINO_CHANNEL', '@Vexron_stars')
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode='HTML')
 
@@ -23,7 +25,9 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS kinolar (
     media_type TEXT,
     media_file_id TEXT,
     qismlar_soni INTEGER,
-    janr TEXT
+    janr TEXT,
+    qoshilgan_sana TEXT,
+    korishlar INTEGER DEFAULT 0
 )''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS qismlar (
@@ -34,12 +38,37 @@ cursor.execute('''CREATE TABLE IF NOT EXISTS qismlar (
 )''')
 
 cursor.execute('''CREATE TABLE IF NOT EXISTS pro_users (
-    user_id INTEGER PRIMARY KEY
+    user_id INTEGER PRIMARY KEY,
+    pro_until TEXT
+)''')
+
+cursor.execute('''CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kino_kod INTEGER,
+    user_id INTEGER,
+    username TEXT,
+    matn TEXT,
+    sana TEXT
+)''')
+
+cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+    user_id INTEGER PRIMARY KEY,
+    first_name TEXT,
+    username TEXT,
+    joined_date TEXT
+)''')
+
+cursor.execute('''CREATE TABLE IF NOT EXISTS ratings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kino_kod INTEGER,
+    user_id INTEGER,
+    rating INTEGER
 )''')
 conn.commit()
 
 user_states = {}
 
+# ========== OBUNA ==========
 def check_sub(uid):
     try:
         s = bot.get_chat_member(CHANNEL_USERNAME, uid)
@@ -51,10 +80,41 @@ def is_pro(uid):
     cursor.execute("SELECT user_id FROM pro_users WHERE user_id=?", (uid,))
     return cursor.fetchone() is not None
 
+def add_user(uid, first_name, username):
+    cursor.execute("SELECT user_id FROM users WHERE user_id=?", (uid,))
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?)",
+                      (uid, first_name, username, datetime.now().strftime("%Y-%m-%d %H:%M")))
+        conn.commit()
+
+# ========== KINO YUBORISH KANALGA ==========
+def send_to_channel(kino):
+    try:
+        caption = (
+            f"🎬 <b>YANGI KINO!</b>\n\n"
+            f"🎬 <b>{kino[1]}</b>\n"
+            f"📝 {kino[2][:200]}...\n"
+            f"⭐ {kino[3]}/10\n"
+            f"📂 {kino[7]}\n"
+            f"🔢 Kod: <code>{kino[0]}</code>\n"
+            f"📹 Qismlar: {kino[6]}"
+        )
+        
+        if kino[4] == 'photo':
+            bot.send_photo(KINO_CHANNEL, kino[5], caption=caption)
+        else:
+            bot.send_video(KINO_CHANNEL, kino[5], caption=caption)
+        return True
+    except Exception as e:
+        print(f"Kanalga yuborish xatosi: {e}")
+        return False
+
+# ========== START ==========
 @bot.message_handler(commands=['start'])
 def start(msg):
     uid = msg.from_user.id
     user_states.pop(uid, None)
+    add_user(uid, msg.from_user.first_name, msg.from_user.username)
     
     if not check_sub(uid):
         markup = types.InlineKeyboardMarkup()
@@ -88,11 +148,16 @@ def show_menu(uid):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
         types.InlineKeyboardButton("🔍 Kod orqali qidirish", callback_data="search_code"),
+        types.InlineKeyboardButton("🔎 Nomi orqali qidirish", callback_data="search_name"),
         types.InlineKeyboardButton("📂 Janr orqali qidirish", callback_data="search_genre"),
-        types.InlineKeyboardButton("🎬 NexMovie Pro", callback_data="nexmovie_pro")
+        types.InlineKeyboardButton("⭐ TOP Reyting", callback_data="top_rating"),
+        types.InlineKeyboardButton("🔥 Eng ko'p ko'rilgan", callback_data="top_views"),
+        types.InlineKeyboardButton("🎬 NexMovie Pro", callback_data="nexmovie_pro"),
+        types.InlineKeyboardButton("📊 Statistika", callback_data="stats")
     )
     bot.send_message(uid, f"🎬 Xush kelibsiz!\n👤 {p}", reply_markup=markup)
 
+# ========== ADMIN PANEL ==========
 @bot.message_handler(commands=['admin'])
 def admin(msg):
     uid = msg.from_user.id
@@ -101,9 +166,11 @@ def admin(msg):
     
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add("🎬 Kino qo'shish", "📹 Qism qo'shish")
+    markup.add("📋 Kinolar ro'yxati", "📊 To'liq statistika")
     markup.add("⬅️ Oddiy menyu")
     bot.send_message(uid, "👑 Admin Panel", reply_markup=markup)
 
+# ========== KINO QO'SHISH ==========
 @bot.message_handler(func=lambda m: m.text == "🎬 Kino qo'shish" and m.from_user.id == ADMIN_ID)
 def add_kino(msg):
     uid = msg.from_user.id
@@ -186,15 +253,23 @@ def step_janr(msg):
     uid = msg.from_user.id
     d = user_states[uid]['data']
     
-    cursor.execute('''INSERT INTO kinolar VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+    sana = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    cursor.execute('''INSERT INTO kinolar VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
                    (d['kod'], d['nomi'], d['tavsif'], d['reyting'],
-                    d['media_type'], d['file_id'], d['qismlar'], msg.text))
+                    d['media_type'], d['file_id'], d['qismlar'], msg.text, sana, 0))
     conn.commit()
     
-    bot.send_message(uid, f"✅ {d['nomi']} qo'shildi!")
+    # Kanalga avtomatik yuborish
+    kino = (d['kod'], d['nomi'], d['tavsif'], d['reyting'],
+            d['media_type'], d['file_id'], d['qismlar'], msg.text)
+    send_to_channel(kino)
+    
+    bot.send_message(uid, f"✅ {d['nomi']} qo'shildi va kanalga yuborildi!")
     user_states.pop(uid, None)
     admin(msg)
 
+# ========== QISM QO'SHISH ==========
 @bot.message_handler(func=lambda m: m.text == "📹 Qism qo'shish" and m.from_user.id == ADMIN_ID)
 def add_qism(msg):
     uid = msg.from_user.id
@@ -250,6 +325,7 @@ def step_qvideo(msg):
     user_states.pop(uid, None)
     admin(msg)
 
+# ========== KOD ORQALI QIDIRISH ==========
 @bot.callback_query_handler(func=lambda c: c.data == "search_code")
 def search_code(call):
     uid = call.from_user.id
@@ -259,29 +335,80 @@ def search_code(call):
     user_states[uid] = {'step': 'search'}
     bot.send_message(uid, "Kino kodini kiriting:")
 
-@bot.message_handler(func=lambda m: user_states.get(m.from_user.id, {}).get('step') == 'search')
-def show_kino(msg):
+# ========== NOMI ORQALI QIDIRISH ==========
+@bot.callback_query_handler(func=lambda c: c.data == "search_name")
+def search_name(call):
+    uid = call.from_user.id
+    if not check_sub(uid):
+        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True); return
+    
+    user_states[uid] = {'step': 'search_name'}
+    bot.send_message(uid, "Kino nomini kiriting:")
+
+@bot.message_handler(func=lambda m: user_states.get(m.from_user.id, {}).get('step') == 'search_name')
+def show_kino_name(msg):
     uid = msg.from_user.id
-    if not msg.text.isdigit():
-        bot.send_message(uid, "Raqam kiriting!"); return
+    nomi = msg.text.strip()
     
-    cursor.execute("SELECT * FROM kinolar WHERE kino_kod=?", (int(msg.text),))
-    k = cursor.fetchone()
+    cursor.execute("SELECT * FROM kinolar WHERE kino_nomi LIKE ?", (f'%{nomi}%',))
+    kinolar = cursor.fetchall()
     
-    if not k:
-        bot.send_message(uid, "Topilmadi!")
-        user_states.pop(uid, None); return
+    if not kinolar:
+        bot.send_message(uid, "❌ Topilmadi!")
+        user_states.pop(uid, None)
+        return
     
     user_states.pop(uid, None)
     
-    cap = f"🎬 {k[1]}\n📝 {k[2]}\n⭐ {k[3]}/10\n📂 {k[7]}\n🔢 {k[0]}\n📹 {k[6]}"
-    markup = types.InlineKeyboardMarkup()
+    if len(kinolar) == 1:
+        send_kino_info(uid, kinolar[0])
+    else:
+        markup = types.InlineKeyboardMarkup(row_width=1)
+        for k in kinolar:
+            markup.add(types.InlineKeyboardButton(
+                f"🎬 {k[1]} (⭐{k[3]})",
+                callback_data=f"v_{k[0]}"
+            ))
+        markup.add(types.InlineKeyboardButton("◀️ Orqaga", callback_data="back"))
+        bot.send_message(uid, f"'{nomi}' bo'yicha topildi:", reply_markup=markup)
+
+# ========== KINO KO'RSATISH ==========
+def send_kino_info(uid, k, increase_view=True):
+    if increase_view:
+        cursor.execute("UPDATE kinolar SET korishlar = korishlar + 1 WHERE kino_kod=?", (k[0],))
+        conn.commit()
+    
+    cap = (
+        f"🎬 <b>{k[1]}</b>\n\n"
+        f"📝 {k[2]}\n"
+        f"⭐ {k[3]}/10\n"
+        f"📂 {k[7]}\n"
+        f"🔢 Kod: <code>{k[0]}</code>\n"
+        f"📹 Qismlar: {k[6]}\n"
+        f"👁 Ko'rilgan: {k[9]}\n"
+        f"📅 Qo'shilgan: {k[8]}"
+    )
+    
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Reyting tugmalari
+    markup.add(
+        types.InlineKeyboardButton("⭐1", callback_data=f"rate_{k[0]}_1"),
+        types.InlineKeyboardButton("⭐2", callback_data=f"rate_{k[0]}_2"),
+        types.InlineKeyboardButton("⭐3", callback_data=f"rate_{k[0]}_3"),
+        types.InlineKeyboardButton("⭐4", callback_data=f"rate_{k[0]}_4"),
+        types.InlineKeyboardButton("⭐5", callback_data=f"rate_{k[0]}_5")
+    )
     
     if k[6] > 0:
         cursor.execute("SELECT qism_raqami FROM qismlar WHERE kino_kod=? ORDER BY qism_raqami", (k[0],))
         for q in cursor.fetchall():
             markup.add(types.InlineKeyboardButton(f"📹 {q[0]}-qism", callback_data=f"w_{k[0]}_{q[0]}"))
     
+    markup.add(
+        types.InlineKeyboardButton("💬 Fikr bildirish", callback_data=f"review_{k[0]}"),
+        types.InlineKeyboardButton("📋 Fikrlar", callback_data=f"reviews_{k[0]}")
+    )
     markup.add(types.InlineKeyboardButton("◀️ Orqaga", callback_data="back"))
     
     if k[4] == 'photo':
@@ -289,6 +416,72 @@ def show_kino(msg):
     else:
         bot.send_video(uid, k[5], caption=cap, reply_markup=markup)
 
+# ========== REYTING BOSISH ==========
+@bot.callback_query_handler(func=lambda c: c.data.startswith('rate_'))
+def rate_kino(call):
+    uid = call.from_user.id
+    parts = call.data.split('_')
+    kod = int(parts[1])
+    rating = int(parts[2])
+    
+    cursor.execute("SELECT id FROM ratings WHERE kino_kod=? AND user_id=?", (kod, uid))
+    if cursor.fetchone():
+        cursor.execute("UPDATE ratings SET rating=? WHERE kino_kod=? AND user_id=?", (rating, kod, uid))
+    else:
+        cursor.execute("INSERT INTO ratings (kino_kod, user_id, rating) VALUES (?, ?, ?)", (kod, uid, rating))
+    conn.commit()
+    
+    # O'rtacha reytingni yangilash
+    cursor.execute("SELECT AVG(rating) FROM ratings WHERE kino_kod=?", (kod,))
+    avg = cursor.fetchone()[0]
+    cursor.execute("UPDATE kinolar SET reyting=? WHERE kino_kod=?", (round(avg, 1), kod))
+    conn.commit()
+    
+    bot.answer_callback_query(call.id, f"⭐ {rating} baholandingiz!")
+
+# ========== FIKR BILDIRISH ==========
+@bot.callback_query_handler(func=lambda c: c.data.startswith('review_'))
+def review_start(call):
+    uid = call.from_user.id
+    kod = int(call.data.split('_')[1])
+    user_states[uid] = {'step': 'review', 'kod': kod}
+    bot.answer_callback_query(call.id)
+    bot.send_message(uid, "💬 Fikringizni yozing:")
+
+@bot.message_handler(func=lambda m: user_states.get(m.from_user.id, {}).get('step') == 'review')
+def save_review(msg):
+    uid = msg.from_user.id
+    kod = user_states[uid]['kod']
+    
+    username = f"@{msg.from_user.username}" if msg.from_user.username else msg.from_user.first_name
+    
+    cursor.execute("INSERT INTO reviews (kino_kod, user_id, username, matn, sana) VALUES (?, ?, ?, ?, ?)",
+                   (kod, uid, username, msg.text, datetime.now().strftime("%Y-%m-%d %H:%M")))
+    conn.commit()
+    
+    bot.send_message(uid, "✅ Fikringiz qabul qilindi!")
+    user_states.pop(uid, None)
+
+# ========== FIKRLARNI KO'RISH ==========
+@bot.callback_query_handler(func=lambda c: c.data.startswith('reviews_'))
+def show_reviews(call):
+    uid = call.from_user.id
+    kod = int(call.data.split('_')[1])
+    
+    cursor.execute("SELECT * FROM reviews WHERE kino_kod=? ORDER BY id DESC LIMIT 10", (kod,))
+    reviews = cursor.fetchall()
+    
+    if not reviews:
+        bot.answer_callback_query(call.id, "❌ Fikrlar yo'q!", show_alert=True)
+        return
+    
+    text = f"<b>💬 Fikrlar:</b>\n\n"
+    for r in reviews:
+        text += f"👤 {r[3]}: {r[4]}\n📅 {r[5]}\n➖➖➖➖➖\n"
+    
+    bot.send_message(uid, text)
+
+# ========== QISMNI KO'RISH ==========
 @bot.callback_query_handler(func=lambda c: c.data.startswith('w_'))
 def watch(call):
     _, kod, qism = call.data.split('_')
@@ -298,6 +491,7 @@ def watch(call):
         bot.send_video(call.from_user.id, r[0], caption=f"📹 {qism}-qism")
         bot.answer_callback_query(call.id, "✅ Yuborildi!")
 
+# ========== JANR ORQALI ==========
 @bot.callback_query_handler(func=lambda c: c.data == "search_genre")
 def genre(call):
     uid = call.from_user.id
@@ -337,157 +531,15 @@ def show_genre(call):
     
     bot.edit_message_text(f"'{janr}' janridagi kinolar:", uid, call.message.message_id, reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda c: c.data.startswith('v_'))
-def view_kino(call):
-    uid = call.from_user.id
-    kod = int(call.data[2:])
-    
-    cursor.execute("SELECT * FROM kinolar WHERE kino_kod=?", (kod,))
-    k = cursor.fetchone()
-    
-    if k:
-        bot.delete_message(uid, call.message.message_id)
-        cap = f"🎬 {k[1]}\n📝 {k[2]}\n⭐ {k[3]}/10\n📂 {k[7]}\n🔢 {k[0]}"
-        markup = types.InlineKeyboardMarkup()
-        if k[6] > 0:
-            cursor.execute("SELECT qism_raqami FROM qismlar WHERE kino_kod=?", (k[0],))
-            for q in cursor.fetchall():
-                markup.add(types.InlineKeyboardButton(f"📹 {q[0]}-qism", callback_data=f"w_{k[0]}_{q[0]}"))
-        markup.add(types.InlineKeyboardButton("◀️ Orqaga", callback_data="back"))
-        
-        if k[4] == 'photo':
-            bot.send_photo(uid, k[5], caption=cap, reply_markup=markup)
-        else:
-            bot.send_video(uid, k[5], caption=cap, reply_markup=markup)
-
-@bot.callback_query_handler(func=lambda c: c.data == "nexmovie_pro")
-def pro(call):
+# ========== TOP REYTING ==========
+@bot.callback_query_handler(func=lambda c: c.data == "top_rating")
+def top_rating(call):
     uid = call.from_user.id
     if not check_sub(uid):
         bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True); return
     
-    if is_pro(uid):
-        bot.answer_callback_query(call.id, "✅ Siz PROsiz!", show_alert=True); return
+    cursor.execute("SELECT * FROM kinolar ORDER BY reyting DESC LIMIT 10")
+    kinolar = cursor.fetchall()
     
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("💳 To'lov qildim", callback_data="pay"))
-    markup.add(types.InlineKeyboardButton("◀️ Orqaga", callback_data="back"))
-    
-    bot.edit_message_text(
-        "💎 NexMovie Pro\n\n"
-        "💰 14.000 so'm\n"
-        "💳 VISA: 4916 9903 1619 3280\n\n"
-        "To'lov qilib, chekni yuboring!",
-        uid, call.message.message_id, reply_markup=markup
-    )
-
-@bot.callback_query_handler(func=lambda c: c.data == "pay")
-def pay(call):
-    uid = call.from_user.id
-    user_states[uid] = {'step': 'check'}
-    bot.answer_callback_query(call.id)
-    bot.send_message(uid, "Chek rasmini yuboring:")
-
-@bot.message_handler(func=lambda m: user_states.get(m.from_user.id, {}).get('step') == 'check',
-                     content_types=['photo'])
-def get_check(msg):
-    uid = msg.from_user.id
-    file_id = msg.photo[-1].file_id
-    
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"ok_{uid}"),
-        types.InlineKeyboardButton("❌ Bekor qilish", callback_data=f"no_{uid}")
-    )
-    
-    bot.send_photo(ADMIN_ID, file_id,
-        caption=f"📩 To'lov cheki!\n👤 {msg.from_user.first_name}\n🆔 {uid}\n💰 14.000 so'm",
-        reply_markup=markup
-    )
-    
-    bot.send_message(uid, "✅ Chek yuborildi! Admin tekshiradi.")
-    user_states.pop(uid, None)
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith('ok_'))
-def ok_pro(call):
-    if call.from_user.id != ADMIN_ID:
-        bot.answer_callback_query(call.id, "❌ Admin emassiz!", show_alert=True); return
-    
-    uid = int(call.data[3:])
-    cursor.execute("INSERT OR REPLACE INTO pro_users VALUES (?)", (uid,))
-    conn.commit()
-    
-    bot.edit_message_caption(
-        caption=call.message.caption + "\n\n✅ TASDIQLANDI!",
-        chat_id=ADMIN_ID, message_id=call.message.message_id
-    )
-    bot.answer_callback_query(call.id, "✅ PRO berildi!")
-    
-    try:
-        bot.send_message(uid, "🎉 Tabriklaymiz! Siz PRO foydalanuvchisiz!")
-    except:
-        pass
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith('no_'))
-def no_pro(call):
-    if call.from_user.id != ADMIN_ID:
-        bot.answer_callback_query(call.id, "❌ Admin emassiz!", show_alert=True); return
-    
-    uid = int(call.data[3:])
-    
-    bot.edit_message_caption(
-        caption=call.message.caption + "\n\n❌ BEKOR QILINDI!",
-        chat_id=ADMIN_ID, message_id=call.message.message_id
-    )
-    bot.answer_callback_query(call.id, "❌ Bekor qilindi!")
-    
-    try:
-        bot.send_message(uid, "❌ So'rovingiz bekor qilindi!")
-    except:
-        pass
-
-@bot.callback_query_handler(func=lambda c: c.data == "back")
-def back(call):
-    uid = call.from_user.id
-    user_states.pop(uid, None)
-    bot.delete_message(uid, call.message.message_id)
-    show_menu(uid)
-
-@bot.message_handler(func=lambda m: m.text == "⬅️ Oddiy menyu" and m.from_user.id == ADMIN_ID)
-def normal(msg):
-    uid = msg.from_user.id
-    markup = types.ReplyKeyboardRemove()
-    bot.send_message(uid, "✅ Oddiy menyu", reply_markup=markup)
-
-@bot.message_handler(commands=['cancel'])
-def cancel(msg):
-    uid = msg.from_user.id
-    user_states.pop(uid, None)
-    bot.send_message(uid, "❌ Bekor qilindi!")
-
-@bot.message_handler(func=lambda m: True)
-def auto(msg):
-    uid = msg.from_user.id
-    if uid not in user_states and msg.text and msg.text.isdigit():
-        cursor.execute("SELECT * FROM kinolar WHERE kino_kod=?", (int(msg.text),))
-        k = cursor.fetchone()
-        if k:
-            cap = f"🎬 {k[1]}\n📝 {k[2]}\n⭐ {k[3]}/10\n📂 {k[7]}"
-            markup = types.InlineKeyboardMarkup()
-            if k[6] > 0:
-                cursor.execute("SELECT qism_raqami FROM qismlar WHERE kino_kod=?", (k[0],))
-                for q in cursor.fetchall():
-                    markup.add(types.InlineKeyboardButton(f"📹 {q[0]}-qism", callback_data=f"w_{k[0]}_{q[0]}"))
-            markup.add(types.InlineKeyboardButton("◀️ Orqaga", callback_data="back"))
-            
-            if k[4] == 'photo':
-                bot.send_photo(uid, k[5], caption=cap, reply_markup=markup)
-            else:
-                bot.send_video(uid, k[5], caption=cap, reply_markup=markup)
-            return
-
-# ========== ISHGA TUSHIRISH ==========
-print("🤖 Bot ishga tushdi!")
-bot.remove_webhook()
-time.sleep(1)
-bot.polling(none_stop=True)
+    if not kinolar:
+        bot.answer_callback_query(call.id, "Kinolar yo'q!", show_aler
