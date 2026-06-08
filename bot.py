@@ -478,8 +478,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         comments = db.get_comments(code)
         if comments:
             text = "Fikrlar:\n\n"
-                        for c in comments[-10:]:        
-                text += f"{c['name']}: {c['text']}\n{c['date']}\n---\n"            
+                        for c in comments[-10:]:            
+                text += f"{c['name']}: {c['text']}\n{c['date']}\n---\n"                  
         else:
             text = "Fikrlar yoq!"
         kb = [[InlineKeyboardButton("Orqaga", callback_data=f"mv_{code}")]]
