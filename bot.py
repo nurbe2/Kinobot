@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "NexMovie Bot"
+    return "🎬 NexMovie Bot"
 
 @app.route('/ping')
 def ping():
@@ -25,7 +25,7 @@ def run_flask():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', 'TOKEN')
 ADMIN_ID = 8306639956
 CHANNEL = '@Vexron_stars'
 PRO_PRICE = "14.000 som"
@@ -50,12 +50,7 @@ class DB:
             json.dump(self.d, f, ensure_ascii=False)
     
     def add_movie(self, code, name, desc, genre, parts, photo=None):
-        self.d["movies"][str(code)] = {
-            "name": name, "desc": desc, "genre": genre,
-            "parts_count": int(parts), "parts": {},
-            "rating": 0, "views": 0, "photo": photo,
-            "added": datetime.now().strftime("%Y-%m-%d")
-        }
+        self.d["movies"][str(code)] = {"name": name, "desc": desc, "genre": genre, "parts_count": int(parts), "parts": {}, "rating": 0, "views": 0, "photo": photo, "added": datetime.now().strftime("%Y-%m-%d")}
         self.save()
     
     def delete_movie(self, code):
@@ -77,26 +72,16 @@ class DB:
         return self.d.get("movies", {})
     
     def search_by_name(self, query):
-        results = []
-        for code, m in self.d["movies"].items():
-            if query.lower() in m["name"].lower():
-                results.append({"code": code, **m})
-        return results
+        return [{"code": c, **m} for c, m in self.d["movies"].items() if query.lower() in m["name"].lower()]
     
     def search_by_genre(self, genre):
-        results = []
-        for code, m in self.d["movies"].items():
-            if genre.lower() in m["genre"].lower():
-                results.append({"code": code, **m})
-        return results
+        return [{"code": c, **m} for c, m in self.d["movies"].items() if genre.lower() in m["genre"].lower()]
     
     def get_top_rated(self, limit=10):
-        movies = [{"code": c, **m} for c, m in self.d["movies"].items()]
-        return sorted(movies, key=lambda x: x["rating"], reverse=True)[:limit]
+        return sorted([{"code": c, **m} for c, m in self.d["movies"].items()], key=lambda x: x["rating"], reverse=True)[:limit]
     
     def get_top_viewed(self, limit=10):
-        movies = [{"code": c, **m} for c, m in self.d["movies"].items()]
-        return sorted(movies, key=lambda x: x["views"], reverse=True)[:limit]
+        return sorted([{"code": c, **m} for c, m in self.d["movies"].items()], key=lambda x: x["views"], reverse=True)[:limit]
     
     def add_view(self, code):
         if str(code) in self.d["movies"]:
@@ -113,11 +98,7 @@ class DB:
         return self.d.get("ratings", {}).get(str(code), {}).get(str(user_id))
     
     def add_comment(self, code, user_id, name, text):
-        self.d.setdefault("comments", {}).setdefault(str(code), [])
-        self.d["comments"][str(code)].append({
-            "user_id": str(user_id), "name": name, "text": text,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M")
-        })
+        self.d.setdefault("comments", {}).setdefault(str(code), []).append({"user_id": str(user_id), "name": name, "text": text, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
         self.d["comments"][str(code)] = self.d["comments"][str(code)][-50:]
         self.save()
     
@@ -135,10 +116,7 @@ class DB:
         return False
     
     def add_payment(self, uid, name):
-        self.d.setdefault("payments", []).append({
-            "uid": str(uid), "name": name,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M")
-        })
+        self.d.setdefault("payments", []).append({"uid": str(uid), "name": name, "date": datetime.now().strftime("%Y-%m-%d %H:%M")})
         self.save()
     
     def get_genres(self):
@@ -149,13 +127,7 @@ class DB:
         return sorted(genres)
     
     def get_stats(self):
-        return {
-            "movies": len(self.d.get("movies", {})),
-            "users": len(self.d.get("users", {})),
-            "pro": len(self.d.get("pro", [])),
-            "views": sum(m["views"] for m in self.d["movies"].values()),
-            "comments": sum(len(c) for c in self.d.get("comments", {}).values())
-        }
+        return {"movies": len(self.d.get("movies", {})), "users": len(self.d.get("users", {})), "pro": len(self.d.get("pro", [])), "views": sum(m["views"] for m in self.d["movies"].values()), "comments": sum(len(c) for c in self.d.get("comments", {}).values())}
 
 db = DB()
 
@@ -195,8 +167,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.save()
     
     if not await check_sub(uid, context):
-        kb = [[InlineKeyboardButton("📢 Obuna bo'lish", url=f"https://t.me/{CHANNEL[1:]}")],
-              [InlineKeyboardButton("✅ Tekshirish", callback_data="check_sub")]]
+        kb = [[InlineKeyboardButton("📢 Obuna bo'lish", url=f"https://t.me/{CHANNEL[1:]}")], [InlineKeyboardButton("✅ Tekshirish", callback_data="check_sub")]]
         await update.message.reply_text(f"👋 Salom, {name}!\n\n📢 {CHANNEL} kanaliga obuna bo'ling!", reply_markup=InlineKeyboardMarkup(kb))
         return
     
@@ -205,10 +176,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_sub_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
-    uid = q.from_user.id
-    if await check_sub(uid, context):
+    if await check_sub(q.from_user.id, context):
         await q.delete_message()
-        await context.bot.send_message(uid, "🎬 Xush kelibsiz!\n\n🔢 Kino kodini yuboring:", reply_markup=main_menu(uid))
+        await context.bot.send_message(q.from_user.id, "🎬 Xush kelibsiz!\n\n🔢 Kino kodini yuboring:", reply_markup=main_menu(q.from_user.id))
     else:
         await q.answer("❌ Obuna bo'lmagansiz!", show_alert=True)
 
@@ -258,26 +228,21 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif context.user_data.get('add_movie'):
         step = context.user_data.get('m_step')
         if step == 'code':
-            context.user_data['m_code'] = txt
-            context.user_data['m_step'] = 'name'
+            context.user_data['m_code'] = txt; context.user_data['m_step'] = 'name'
             await update.message.reply_text("📝 Kino nomini yuboring:")
         elif step == 'name':
-            context.user_data['m_name'] = txt
-            context.user_data['m_step'] = 'desc'
+            context.user_data['m_name'] = txt; context.user_data['m_step'] = 'desc'
             await update.message.reply_text("📄 Tavsifni yuboring:")
         elif step == 'desc':
-            context.user_data['m_desc'] = txt
-            context.user_data['m_step'] = 'genre'
+            context.user_data['m_desc'] = txt; context.user_data['m_step'] = 'genre'
             await update.message.reply_text("🎭 Janrni yuboring (vergul bilan):")
         elif step == 'genre':
-            context.user_data['m_genre'] = txt
-            context.user_data['m_step'] = 'parts'
+            context.user_data['m_genre'] = txt; context.user_data['m_step'] = 'parts'
             await update.message.reply_text("🎞 Qismlar sonini yuboring:")
         elif step == 'parts':
             try:
                 parts = int(txt)
-                context.user_data['m_parts'] = parts
-                context.user_data['m_step'] = 'photo'
+                context.user_data['m_parts'] = parts; context.user_data['m_step'] = 'photo'
                 await update.message.reply_text("🖼 Kino rasmini yuboring (yoki /skip):")
             except:
                 await update.message.reply_text("❌ Raqam kiriting!")
@@ -286,17 +251,14 @@ async def handle_admin_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if step == 'code':
             movie = db.get_movie(txt)
             if not movie:
-                await update.message.reply_text("❌ Kino topilmadi!")
-                context.user_data['add_part'] = False
+                await update.message.reply_text("❌ Kino topilmadi!"); context.user_data['add_part'] = False
                 return
-            context.user_data['p_code'] = txt
-            context.user_data['p_step'] = 'num'
+            context.user_data['p_code'] = txt; context.user_data['p_step'] = 'num'
             await update.message.reply_text(f"🔢 Qism raqamini yuboring (1-{movie['parts_count']}):")
         elif step == 'num':
             try:
                 part_num = int(txt)
-                context.user_data['p_num'] = part_num
-                context.user_data['p_step'] = 'video'
+                context.user_data['p_num'] = part_num; context.user_data['p_step'] = 'video'
                 await update.message.reply_text("📹 Video yuboring:")
             except:
                 await update.message.reply_text("❌ Raqam kiriting!")
@@ -351,9 +313,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('searching'):
         movies = db.search_by_name(txt)
         if movies:
-            kb = []
-            for m in movies[:10]:
-                kb.append([InlineKeyboardButton(f"🎬 {m['name'][:30]}", callback_data=f"mv_{m['code']}")])
+            kb = [[InlineKeyboardButton(f"🎬 {m['name'][:30]}", callback_data=f"mv_{m['code']}")] for m in movies[:10]]
             kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="main")])
             await update.message.reply_text(f"🔍 '{txt}' bo'yicha topildi:", reply_markup=InlineKeyboardMarkup(kb))
         else:
@@ -373,14 +333,7 @@ async def show_movie(update, code, movie, uid):
     db.add_view(code)
     user_rating = db.get_user_rating(code, uid)
     
-    text = f"🎬 {movie['name']}\n\n"
-    text += f"📝 {movie.get('desc', '')[:300]}\n\n"
-    text += f"⭐ Reyting: {movie['rating']}/5\n"
-    text += f"🎭 Janr: {movie['genre']}\n"
-    text += f"🔢 Kod: {code}\n"
-    text += f"🎞 Qismlar: {movie['parts_count']}\n"
-    text += f"👁 Ko'rishlar: {movie['views']}\n"
-    text += f"📅 Qo'shilgan: {movie['added']}"
+    text = f"🎬 {movie['name']}\n\n📝 {movie.get('desc', '')[:300]}\n\n⭐ Reyting: {movie['rating']}/5\n🎭 Janr: {movie['genre']}\n🔢 Kod: {code}\n🎞 Qismlar: {movie['parts_count']}\n👁 Ko'rishlar: {movie['views']}\n📅 Qo'shilgan: {movie['added']}"
     
     kb = []
     
@@ -389,10 +342,7 @@ async def show_movie(update, code, movie, uid):
     else:
         kb.append([InlineKeyboardButton(f"✅ Sizning baho: {user_rating}⭐", callback_data="no")])
     
-    parts_row = []
-    for i in range(1, movie['parts_count'] + 1):
-        if str(i) in movie.get("parts", {}):
-            parts_row.append(InlineKeyboardButton(f"▶️{i}", callback_data=f"pt_{code}_{i}"))
+    parts_row = [InlineKeyboardButton(f"▶️{i}", callback_data=f"pt_{code}_{i}") for i in range(1, movie['parts_count'] + 1) if str(i) in movie.get("parts", {})]
     if parts_row:
         kb.append(parts_row)
     
@@ -435,9 +385,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         genre = d.replace("gn_", "")
         movies = db.search_by_genre(genre)
         if movies:
-            kb = []
-            for m in movies[:10]:
-                kb.append([InlineKeyboardButton(f"🎬 {m['name'][:30]}", callback_data=f"mv_{m['code']}")])
+            kb = [[InlineKeyboardButton(f"🎬 {m['name'][:30]}", callback_data=f"mv_{m['code']}")] for m in movies[:10]]
             kb.append([InlineKeyboardButton("🔙 Orqaga", callback_data="genres")])
             await q.edit_message_text(f"🎭 '{genre}' janridagi kinolar:", reply_markup=InlineKeyboardMarkup(kb))
         else:
@@ -472,18 +420,14 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await q.delete_message()
             await show_movie(update, code, movie, uid)
     elif d.startswith("rt_"):
-        parts = d.split("_")
-        code = parts[1]
-        stars = int(parts[2])
+        code, stars = d.split("_")[1], int(d.split("_")[2])
         db.add_rating(code, uid, stars)
         await q.answer(f"⭐ {stars} yulduz!")
         movie = db.get_movie(code)
         if movie:
             await show_movie(update, code, movie, uid)
     elif d.startswith("pt_"):
-        parts = d.split("_")
-        code = parts[1]
-        part_num = parts[2]
+        code, part_num = d.split("_")[1], d.split("_")[2]
         movie = db.get_movie(code)
         if movie and part_num in movie.get("parts", {}):
             await q.message.reply_video(movie["parts"][part_num], caption=f"🎬 {movie['name']} - {part_num}-qism")
@@ -494,19 +438,13 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif d.startswith("cms_"):
         code = d.replace("cms_", "")
         comments = db.get_comments(code)
-        if comments:
-            text = "💬 Fikrlar:\n\n"
-            for c in comments[-10:]:
-                text += f"👤 {c['name']}: {c['text']}\n📅 {c['date']}\n➖➖➖\n"
-        else:
-            text = "📭 Fikrlar yo'q!"
+        text = "💬 Fikrlar:\n\n" + "\n".join([f"👤 {c['name']}: {c['text']}\n📅 {c['date']}\n➖➖➖" for c in comments[-10:]]) if comments else "📭 Fikrlar yo'q!"
         kb = [[InlineKeyboardButton("🔙 Orqaga", callback_data=f"mv_{code}")]]
         await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     elif d == "pro_buy":
         context.user_data['buying_pro'] = True
-        text = f"👑 NexMovie Pro\n\n💰 Narxi: {PRO_PRICE}\n💳 Karta: {CARD}\n\n📸 To'lov qilib, chek rasmini yuboring!"
-        kb = [[InlineKeyboardButton("🔙 Orqaga", callback_data="main")]]
-        await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
+        text = f"👑 NexMovie Pro\n\n💰 Narxi: {PRO_PRICE}\n💳 Karta: <code>{CARD}</code>\n\n📸 To'lov qilib, <b>chek rasmini</b> shu yerga yuboring!"
+        await q.edit_message_text(text, parse_mode='HTML')
     elif d == "pro_ok":
         await q.answer("💎 Siz PRO foydalanuvchisisiz!", show_alert=True)
     elif d == "main":
@@ -524,16 +462,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if context.user_data.get('buying_pro'):
         photo = update.message.photo[-1]
-        kb = [[InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"app_{uid}"), 
-               InlineKeyboardButton("❌ Bekor", callback_data=f"rej_{uid}")]]
-        await context.bot.send_photo(
-            ADMIN_ID, 
-            photo.file_id, 
-            caption=f"📩 PRO so'rovi\n👤 {update.effective_user.first_name}\n🆔 {uid}\n💰 {PRO_PRICE}",
-            reply_markup=InlineKeyboardMarkup(kb)
-        )
+        kb = [[InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"app_{uid}"), InlineKeyboardButton("❌ Bekor", callback_data=f"rej_{uid}")]]
+        await context.bot.send_photo(ADMIN_ID, photo.file_id, caption=f"📩 PRO so'rovi\n👤 {update.effective_user.first_name}\n🆔 <code>{uid}</code>\n💰 {PRO_PRICE}", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
         db.add_payment(uid, update.effective_user.first_name)
-        await update.message.reply_text("✅ Chek yuborildi! Admin tasdiqlaydi.")
+        await update.message.reply_text("✅ Chek yuborildi! Admin tasdiqlaydi.\n\n<i>Tez orada PRO aktivlashtiriladi</i>", parse_mode='HTML')
         context.user_data['buying_pro'] = False
         return
 
@@ -545,15 +477,18 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if d.startswith("app_"):
         target = d.replace("app_", "")
-        db.add_pro(target)
-        try:
-            await context.bot.send_message(int(target), "🎉 PRO aktivlashtirildi!")
-        except:
-            pass
-        await q.edit_message_caption(caption=f"{q.message.caption}\n\n✅ TASDIQLANDI!")
+        if db.add_pro(target):
+            try:
+                await context.bot.send_message(int(target), "🎉 Tabriklaymiz! PRO aktivlashtirildi!\n\n/start bosib tekshiring.")
+            except:
+                pass
+            await q.edit_message_caption(caption=f"{q.message.caption}\n\n✅ TASDIQLANDI!")
+        else:
+            await q.answer("Allaqachon PRO!", show_alert=True)
     elif d.startswith("rej_"):
+        target = d.replace("rej_", "")
         try:
-            await context.bot.send_message(int(d.replace("rej_", "")), "❌ To'lov rad etildi.")
+            await context.bot.send_message(int(target), "❌ To'lov rad etildi. Qaytadan urinib ko'ring.")
         except:
             pass
         await q.edit_message_caption(caption=f"{q.message.caption}\n\n❌ RAD ETILDI!")
