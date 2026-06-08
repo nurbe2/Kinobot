@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "🎬 NexMovie Bot"
+    return "🎬 NexMovie Pro Max"
 
 @app.route('/ping')
 def ping():
@@ -25,7 +25,7 @@ def run_flask():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', 'TOKEN')
 ADMIN_ID = 8306639956
 CHANNEL = '@Vexron_stars'
 PRO_PRICE = "14.000 som"
@@ -420,14 +420,18 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await q.delete_message()
             await show_movie(update, code, movie, uid)
     elif d.startswith("rt_"):
-        code, stars = d.split("_")[1], int(d.split("_")[2])
+        parts = d.split("_")
+        code = parts[1]
+        stars = int(parts[2])
         db.add_rating(code, uid, stars)
         await q.answer(f"⭐ {stars} yulduz!")
         movie = db.get_movie(code)
         if movie:
             await show_movie(update, code, movie, uid)
     elif d.startswith("pt_"):
-        code, part_num = d.split("_")[1], d.split("_")[2]
+        parts = d.split("_")
+        code = parts[1]
+        part_num = parts[2]
         movie = db.get_movie(code)
         if movie and part_num in movie.get("parts", {}):
             await q.message.reply_video(movie["parts"][part_num], caption=f"🎬 {movie['name']} - {part_num}-qism")
@@ -438,7 +442,12 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif d.startswith("cms_"):
         code = d.replace("cms_", "")
         comments = db.get_comments(code)
-        text = "💬 Fikrlar:\n\n" + "\n".join([f"👤 {c['name']}: {c['text']}\n📅 {c['date']}\n➖➖➖" for c in comments[-10:]]) if comments else "📭 Fikrlar yo'q!"
+        if comments:
+            text = "💬 Fikrlar:\n\n"
+            for c in comments[-10:]:
+                text += f"👤 {c['name']}: {c['text']}\n📅 {c['date']}\n➖➖➖\n"
+        else:
+            text = "📭 Fikrlar yo'q!"
         kb = [[InlineKeyboardButton("🔙 Orqaga", callback_data=f"mv_{code}")]]
         await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     elif d == "pro_buy":
