@@ -470,7 +470,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     elif d == "stats":
         s = db.get_stats()
-                text = f"📊 Statistika\n\n👥 {s['users']} | 🎬 {s['movies']} | 👁 {s['views']}\n💎 {s['pro']} | 💬 {s['comments']}"
+        text = f"📊 Statistika\n\n👥 {s['users']} | 🎬 {s['movies']} | 👁 {s['views']}\n💎 {s['pro']} | 💬 {s['comments']}"
         kb = [[InlineKeyboardButton("🔙 Orqaga", callback_data="main")]]
         await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     elif d.startswith("mv_"):
