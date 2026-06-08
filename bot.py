@@ -3,10 +3,19 @@ from telebot import types
 import sqlite3
 import time
 import os
+from flask import Flask
 
-BOT_TOKEN = os.environ.get('8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
-ADMIN_ID = int(os.environ.get('ADMIN_ID', '8306639956'))
-CHANNEL_USERNAME = os.environ.get('CHANNEL_USERNAME', '@Vexron_stars')
+# TOKENINGIZNI SHU YERGA YOZING!
+BOT_TOKEN = '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE'
+ADMIN_ID = 8306639956
+CHANNEL_USERNAME = '@Vexron_stars'
+PORT = int(os.environ.get('PORT', 10000))
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot ishlamoqda!"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode='HTML')
 conn = sqlite3.connect('data.db', check_same_thread=False)
@@ -343,7 +352,14 @@ def auto(msg):
             else:
                 bot.send_video(msg.from_user.id, k[5], caption=cap, reply_markup=markup)
 
-print("Bot ishga tushdi!")
-bot.remove_webhook()
-time.sleep(1)
-bot.polling(none_stop=True)
+import threading
+
+def run_bot():
+    print("Bot ishga tushdi!")
+    bot.remove_webhook()
+    time.sleep(1)
+    bot.polling(none_stop=True)
+
+if __name__ == '__main__':
+    threading.Thread(target=run_bot).start()
+    app.run(host='0.0.0.0', port=PORT)
