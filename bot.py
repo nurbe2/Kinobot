@@ -91,7 +91,7 @@ def add_user(uid, first_name, username):
 def send_to_channel(kino):
     try:
         caption = (
-            f"🎬 <b>YANGI KINO!</b>\n\n"
+            "🎬 <b>YANGI KINO!</b>\n\n"
             f"🎬 <b>{kino[1]}</b>\n"
             f"📝 {kino[2][:200]}...\n"
             f"⭐ {kino[3]}/10\n"
@@ -162,7 +162,8 @@ def show_menu(uid):
 def admin(msg):
     uid = msg.from_user.id
     if uid != ADMIN_ID:
-        bot.send_message(uid, "❌ Admin emassiz!"); return
+        bot.send_message(uid, "❌ Admin emassiz!")
+        return
     
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add("🎬 Kino qo'shish", "📹 Qism qo'shish")
@@ -181,8 +182,12 @@ def add_kino(msg):
                      user_states.get(m.from_user.id, {}).get('step') == 'kod')
 def step_kod(msg):
     uid = msg.from_user.id
+    if msg.text == '/cancel':
+        cancel(msg)
+        return
     if not msg.text.isdigit():
-        bot.send_message(uid, "❌ Raqam kiriting!"); return
+        bot.send_message(uid, "❌ Raqam kiriting!")
+        return
     
     user_states[uid]['data']['kod'] = int(msg.text)
     user_states[uid]['step'] = 'nomi'
@@ -192,6 +197,9 @@ def step_kod(msg):
                      user_states.get(m.from_user.id, {}).get('step') == 'nomi')
 def step_nomi(msg):
     uid = msg.from_user.id
+    if msg.text == '/cancel':
+        cancel(msg)
+        return
     user_states[uid]['data']['nomi'] = msg.text
     user_states[uid]['step'] = 'tavsif'
     bot.send_message(uid, "Tavsifni kiriting:")
@@ -200,6 +208,9 @@ def step_nomi(msg):
                      user_states.get(m.from_user.id, {}).get('step') == 'tavsif')
 def step_tavsif(msg):
     uid = msg.from_user.id
+    if msg.text == '/cancel':
+        cancel(msg)
+        return
     user_states[uid]['data']['tavsif'] = msg.text
     user_states[uid]['step'] = 'reyting'
     bot.send_message(uid, "Reyting (1-10):")
@@ -208,12 +219,17 @@ def step_tavsif(msg):
                      user_states.get(m.from_user.id, {}).get('step') == 'reyting')
 def step_reyting(msg):
     uid = msg.from_user.id
+    if msg.text == '/cancel':
+        cancel(msg)
+        return
     try:
         r = float(msg.text)
         if r < 1 or r > 10:
-            bot.send_message(uid, "1-10 gacha!"); return
+            bot.send_message(uid, "1-10 gacha!")
+            return
     except:
-        bot.send_message(uid, "Raqam kiriting!"); return
+        bot.send_message(uid, "Raqam kiriting!")
+        return
     
     user_states[uid]['data']['reyting'] = r
     user_states[uid]['step'] = 'media'
@@ -224,6 +240,10 @@ def step_reyting(msg):
                      content_types=['photo', 'video', 'text'])
 def step_media(msg):
     uid = msg.from_user.id
+    if msg.text and msg.text == '/cancel':
+        cancel(msg)
+        return
+    
     if msg.photo:
         user_states[uid]['data']['media_type'] = 'photo'
         user_states[uid]['data']['file_id'] = msg.photo[-1].file_id
@@ -231,7 +251,8 @@ def step_media(msg):
         user_states[uid]['data']['media_type'] = 'video'
         user_states[uid]['data']['file_id'] = msg.video.file_id
     else:
-        bot.send_message(uid, "Rasm yoki video yuboring!"); return
+        bot.send_message(uid, "Rasm yoki video yuboring!")
+        return
     
     user_states[uid]['step'] = 'qismlar'
     bot.send_message(uid, "Qismlar soni (0 ham mumkin):")
@@ -240,8 +261,12 @@ def step_media(msg):
                      user_states.get(m.from_user.id, {}).get('step') == 'qismlar')
 def step_qismlar(msg):
     uid = msg.from_user.id
+    if msg.text == '/cancel':
+        cancel(msg)
+        return
     if not msg.text.isdigit():
-        bot.send_message(uid, "Raqam kiriting!"); return
+        bot.send_message(uid, "Raqam kiriting!")
+        return
     
     user_states[uid]['data']['qismlar'] = int(msg.text)
     user_states[uid]['step'] = 'janr'
@@ -251,8 +276,11 @@ def step_qismlar(msg):
                      user_states.get(m.from_user.id, {}).get('step') == 'janr')
 def step_janr(msg):
     uid = msg.from_user.id
-    d = user_states[uid]['data']
+    if msg.text == '/cancel':
+        cancel(msg)
+        return
     
+    d = user_states[uid]['data']
     sana = datetime.now().strftime("%Y-%m-%d %H:%M")
     
     cursor.execute('''INSERT INTO kinolar VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -260,7 +288,7 @@ def step_janr(msg):
                     d['media_type'], d['file_id'], d['qismlar'], msg.text, sana, 0))
     conn.commit()
     
-    # Kanalga avtomatik yuborish
+    # Kanalga yuborish
     kino = (d['kod'], d['nomi'], d['tavsif'], d['reyting'],
             d['media_type'], d['file_id'], d['qismlar'], msg.text)
     send_to_channel(kino)
@@ -280,14 +308,19 @@ def add_qism(msg):
                      user_states.get(m.from_user.id, {}).get('step') == 'qkod')
 def step_qkod(msg):
     uid = msg.from_user.id
+    if msg.text == '/cancel':
+        cancel(msg)
+        return
     if not msg.text.isdigit():
-        bot.send_message(uid, "Raqam kiriting!"); return
+        bot.send_message(uid, "Raqam kiriting!")
+        return
     
     kod = int(msg.text)
     cursor.execute("SELECT * FROM kinolar WHERE kino_kod=?", (kod,))
     k = cursor.fetchone()
     if not k:
-        bot.send_message(uid, "Topilmadi!"); return
+        bot.send_message(uid, "Topilmadi!")
+        return
     
     user_states[uid]['data'] = {'kod': kod, 'max': k[6], 'nomi': k[1]}
     user_states[uid]['step'] = 'qraqam'
@@ -297,12 +330,17 @@ def step_qkod(msg):
                      user_states.get(m.from_user.id, {}).get('step') == 'qraqam')
 def step_qraqam(msg):
     uid = msg.from_user.id
+    if msg.text == '/cancel':
+        cancel(msg)
+        return
     if not msg.text.isdigit():
-        bot.send_message(uid, "Raqam kiriting!"); return
+        bot.send_message(uid, "Raqam kiriting!")
+        return
     
     q = int(msg.text)
     if q < 1 or q > user_states[uid]['data']['max']:
-        bot.send_message(uid, f"1 dan {user_states[uid]['data']['max']} gacha!"); return
+        bot.send_message(uid, f"1 dan {user_states[uid]['data']['max']} gacha!")
+        return
     
     user_states[uid]['data']['qism'] = q
     user_states[uid]['step'] = 'qvideo'
@@ -313,8 +351,12 @@ def step_qraqam(msg):
                      content_types=['video', 'text'])
 def step_qvideo(msg):
     uid = msg.from_user.id
+    if msg.text and msg.text == '/cancel':
+        cancel(msg)
+        return
     if not msg.video:
-        bot.send_message(uid, "Video yuboring!"); return
+        bot.send_message(uid, "Video yuboring!")
+        return
     
     d = user_states[uid]['data']
     cursor.execute("INSERT INTO qismlar (kino_kod, qism_raqami, video_file_id) VALUES (?, ?, ?)",
@@ -330,7 +372,8 @@ def step_qvideo(msg):
 def search_code(call):
     uid = call.from_user.id
     if not check_sub(uid):
-        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True); return
+        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True)
+        return
     
     user_states[uid] = {'step': 'search'}
     bot.send_message(uid, "Kino kodini kiriting:")
@@ -340,7 +383,8 @@ def search_code(call):
 def search_name(call):
     uid = call.from_user.id
     if not check_sub(uid):
-        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True); return
+        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True)
+        return
     
     user_states[uid] = {'step': 'search_name'}
     bot.send_message(uid, "Kino nomini kiriting:")
@@ -348,8 +392,12 @@ def search_name(call):
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id, {}).get('step') == 'search_name')
 def show_kino_name(msg):
     uid = msg.from_user.id
-    nomi = msg.text.strip()
+    if msg.text == '/cancel':
+        user_states.pop(uid, None)
+        show_menu(uid)
+        return
     
+    nomi = msg.text.strip()
     cursor.execute("SELECT * FROM kinolar WHERE kino_nomi LIKE ?", (f'%{nomi}%',))
     kinolar = cursor.fetchall()
     
@@ -389,7 +437,7 @@ def send_kino_info(uid, k, increase_view=True):
         f"📅 Qo'shilgan: {k[8]}"
     )
     
-    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup = types.InlineKeyboardMarkup(row_width=5)
     
     # Reyting tugmalari
     markup.add(
@@ -431,7 +479,6 @@ def rate_kino(call):
         cursor.execute("INSERT INTO ratings (kino_kod, user_id, rating) VALUES (?, ?, ?)", (kod, uid, rating))
     conn.commit()
     
-    # O'rtacha reytingni yangilash
     cursor.execute("SELECT AVG(rating) FROM ratings WHERE kino_kod=?", (kod,))
     avg = cursor.fetchone()[0]
     cursor.execute("UPDATE kinolar SET reyting=? WHERE kino_kod=?", (round(avg, 1), kod))
@@ -440,7 +487,7 @@ def rate_kino(call):
     bot.answer_callback_query(call.id, f"⭐ {rating} baholandingiz!")
 
 # ========== FIKR BILDIRISH ==========
-@bot.callback_query_handler(func=lambda c: c.data.startswith('review_'))
+@bot.callback_query_handler(func=lambda c: c.data.startswith('review_') and not c.data.startswith('reviews_'))
 def review_start(call):
     uid = call.from_user.id
     kod = int(call.data.split('_')[1])
@@ -451,8 +498,12 @@ def review_start(call):
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id, {}).get('step') == 'review')
 def save_review(msg):
     uid = msg.from_user.id
-    kod = user_states[uid]['kod']
+    if msg.text == '/cancel':
+        user_states.pop(uid, None)
+        show_menu(uid)
+        return
     
+    kod = user_states[uid]['kod']
     username = f"@{msg.from_user.username}" if msg.from_user.username else msg.from_user.first_name
     
     cursor.execute("INSERT INTO reviews (kino_kod, user_id, username, matn, sana) VALUES (?, ?, ?, ?, ?)",
@@ -475,7 +526,7 @@ def show_reviews(call):
         bot.answer_callback_query(call.id, "❌ Fikrlar yo'q!", show_alert=True)
         return
     
-    text = f"<b>💬 Fikrlar:</b>\n\n"
+    text = "<b>💬 Fikrlar:</b>\n\n"
     for r in reviews:
         text += f"👤 {r[3]}: {r[4]}\n📅 {r[5]}\n➖➖➖➖➖\n"
     
@@ -496,7 +547,8 @@ def watch(call):
 def genre(call):
     uid = call.from_user.id
     if not check_sub(uid):
-        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True); return
+        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True)
+        return
     
     cursor.execute("SELECT DISTINCT janr FROM kinolar")
     janrlar = set()
@@ -507,7 +559,8 @@ def genre(call):
                     janrlar.add(j.strip())
     
     if not janrlar:
-        bot.answer_callback_query(call.id, "Kinolar yo'q!", show_alert=True); return
+        bot.answer_callback_query(call.id, "Kinolar yo'q!", show_alert=True)
+        return
     
     markup = types.InlineKeyboardMarkup(row_width=2)
     for j in sorted(janrlar):
@@ -519,27 +572,4 @@ def genre(call):
 @bot.callback_query_handler(func=lambda c: c.data.startswith('g_'))
 def show_genre(call):
     uid = call.from_user.id
-    janr = call.data[2:]
-    
-    cursor.execute("SELECT * FROM kinolar WHERE janr LIKE ?", (f'%{janr}%',))
-    kinolar = cursor.fetchall()
-    
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    for k in kinolar:
-        markup.add(types.InlineKeyboardButton(f"🎬 {k[1]} (⭐{k[3]})", callback_data=f"v_{k[0]}"))
-    markup.add(types.InlineKeyboardButton("◀️ Orqaga", callback_data="search_genre"))
-    
-    bot.edit_message_text(f"'{janr}' janridagi kinolar:", uid, call.message.message_id, reply_markup=markup)
-
-# ========== TOP REYTING ==========
-@bot.callback_query_handler(func=lambda c: c.data == "top_rating")
-def top_rating(call):
-    uid = call.from_user.id
-    if not check_sub(uid):
-        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True); return
-    
-    cursor.execute("SELECT * FROM kinolar ORDER BY reyting DESC LIMIT 10")
-    kinolar = cursor.fetchall()
-    
-    if not kinolar:
-        bot.answer_callback_query(call.id, "Kinolar yo'q!", show_aler
+    ja
