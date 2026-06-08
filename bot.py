@@ -561,6 +561,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif d == "no":
         await q.answer("Siz baholagansiz!")
 
+
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     
