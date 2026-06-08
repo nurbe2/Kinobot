@@ -4,7 +4,7 @@ import sqlite3
 import time
 import os
 from datetime import datetime
-from flask import Flask
+from flask import Flask, request
 
 BOT_TOKEN = '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE'
 ADMIN_ID = 8306639956
@@ -16,6 +16,15 @@ app = Flask(__name__)
 @app.route('/')
 def home():
     return "OK"
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return 'OK', 200
+    return 'Bad Request', 403
 
 bot = telebot.TeleBot(BOT_TOKEN)
 conn = sqlite3.connect('data.db', check_same_thread=False)
@@ -91,7 +100,6 @@ def admin(msg):
     if msg.from_user.id != ADMIN_ID:
         bot.send_message(msg.from_user.id, "Admin emassiz!")
         return
-    
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     markup.add("Kino qoshish", "Qism qoshish")
     markup.add("Kinolar", "Statistika")
@@ -160,8 +168,7 @@ def step6(msg):
 def step7(msg):
     d = states[msg.from_user.id]['data']
     sana = datetime.now().strftime("%Y-%m-%d")
-    c.execute("INSERT INTO kinolar VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)", 
-              (d['kod'], d['nomi'], d['tavsif'], d['reyting'], d['tip'], d['fayl'], d['qism'], msg.text, sana))
+    c.execute("INSERT INTO kinolar VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)", (d['kod'], d['nomi'], d['tavsif'], d['reyting'], d['tip'], d['fayl'], d['qism'], msg.text, sana))
     conn.commit()
     bot.send_message(msg.from_user.id, "Qoshildi: " + d['nomi'])
     states.pop(msg.from_user.id, None)
@@ -283,8 +290,10 @@ def show_kino_name(msg):
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith('r_'))
 def rate(call):
-    _, kod, rating = call.data.split('_')
-    kod = int(kod); rating = int(rating); uid = call.from_user.id
+    parts = call.data.split('_')
+    kod = int(parts[1])
+    rating = int(parts[2])
+    uid = call.from_user.id
     c.execute("SELECT id FROM ratings WHERE kod=? AND uid=?", (kod, uid))
     if c.fetchone():
         c.execute("UPDATE ratings SET rating=? WHERE kod=? AND uid=?", (rating, kod, uid))
@@ -309,8 +318,7 @@ def save_review(msg):
     uid = msg.from_user.id
     kod = states[uid]['kod']
     user = "@" + msg.from_user.username if msg.from_user.username else msg.from_user.first_name
-    c.execute("INSERT INTO reviews (kod, uid, user, matn, sana) VALUES (?, ?, ?, ?, ?)", 
-              (kod, uid, user, msg.text, datetime.now().strftime("%Y-%m-%d")))
+    c.execute("INSERT INTO reviews (kod, uid, user, matn, sana) VALUES (?, ?, ?, ?, ?)", (kod, uid, user, msg.text, datetime.now().strftime("%Y-%m-%d")))
     conn.commit()
     bot.send_message(uid, "Fikr qoshildi!")
     states.pop(uid, None)
@@ -329,11 +337,13 @@ def show_reviews(call):
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith('w_'))
 def watch(call):
-    _, kod, qism = call.data.split('_')
-    c.execute("SELECT video FROM qismlar WHERE kod=? AND qism_no=?", (int(kod), int(qism)))
+    parts = call.data.split('_')
+    kod = int(parts[1])
+    qism = int(parts[2])
+    c.execute("SELECT video FROM qismlar WHERE kod=? AND qism_no=?", (kod, qism))
     r = c.fetchone()
     if r:
-        bot.send_video(call.from_user.id, r[0], caption=qism + "-qism")
+        bot.send_video(call.from_user.id, r[0], caption=str(qism) + "-qism")
         bot.answer_callback_query(call.id, "OK")
 
 @bot.callback_query_handler(func=lambda c: c.data == "genre")
@@ -397,7 +407,7 @@ def stats(call):
     c.execute("SELECT SUM(korish) FROM kinolar"); v = c.fetchone()[0] or 0
     c.execute("SELECT COUNT(*) FROM pro"); p = c.fetchone()[0]
     c.execute("SELECT COUNT(*) FROM reviews"); r = c.fetchone()[0]
-    text = "👥" + str(u) + "\n🎬" + str(k) + "\n👁" + str(v) + "\n👑" + str(p) + "\n💬" + str(r)
+    text = "Users:" + str(u) + " Kino:" + str(k) + " Views:" + str(v) + " PRO:" + str(p) + " Reviews:" + str(r)
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Orqaga", callback_data="back"))
     bot.edit_message_text(text, call.from_user.id, call.message.message_id, reply_markup=markup)
@@ -422,16 +432,9 @@ def pro_menu(call):
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("Tolov qildim", callback_data="pay"))
     markup.add(types.InlineKeyboardButton("Orqaga", callback_data="back"))
-    bot.edit_message_text("NexMovie Pro\n\n14.000 som\n4916 9903 1619 3280\n\nChek yuboring!", call.from_user.id, call.message.message_id, reply_markup=markup)
+    bot.edit_message_text("NexMovie Pro\n\n14.000 som\n4916 9903 1619 3280", call.from_user.id, call.message.message_id, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda c: c.data == "pay")
 def pay(call):
     states[call.from_user.id] = {'step': 'check'}
-    bot.answer_callback_query(call.id)
-    bot.send_message(call.from_user.id, "Chek rasmi:")
-
-@bot.message_handler(func=lambda m: states.get(m.from_user.id, {}).get('step') == 'check', content_types=['photo'])
-def check_msg(msg):
-    uid = msg.from_user.id
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(types.InlineKeyboardButton("Tasdiqlash", callback_data="o
+    bot.answer_callback_query(call.
