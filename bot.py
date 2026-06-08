@@ -5,7 +5,6 @@ import time
 import os
 from datetime import datetime
 
-# Sozlamalar
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
 ADMIN_ID = int(os.environ.get('ADMIN_ID', '8306639956'))
 CHANNEL_USERNAME = os.environ.get('CHANNEL_USERNAME', '@Vexron_stars')
@@ -13,57 +12,15 @@ KINO_CHANNEL = os.environ.get('KINO_CHANNEL', '@Vexron_stars')
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode='HTML')
 
-# SQLite
 conn = sqlite3.connect('kino_bot.db', check_same_thread=False)
 cursor = conn.cursor()
 
-cursor.execute('''CREATE TABLE IF NOT EXISTS kinolar (
-    kino_kod INTEGER PRIMARY KEY,
-    kino_nomi TEXT,
-    tavsif TEXT,
-    reyting REAL,
-    media_type TEXT,
-    media_file_id TEXT,
-    qismlar_soni INTEGER,
-    janr TEXT,
-    qoshilgan_sana TEXT,
-    korishlar INTEGER DEFAULT 0
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS qismlar (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    kino_kod INTEGER,
-    qism_raqami INTEGER,
-    video_file_id TEXT
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS pro_users (
-    user_id INTEGER PRIMARY KEY,
-    pro_until TEXT
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS reviews (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    kino_kod INTEGER,
-    user_id INTEGER,
-    username TEXT,
-    matn TEXT,
-    sana TEXT
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS users (
-    user_id INTEGER PRIMARY KEY,
-    first_name TEXT,
-    username TEXT,
-    joined_date TEXT
-)''')
-
-cursor.execute('''CREATE TABLE IF NOT EXISTS ratings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    kino_kod INTEGER,
-    user_id INTEGER,
-    rating INTEGER
-)''')
+cursor.execute("CREATE TABLE IF NOT EXISTS kinolar (kino_kod INTEGER PRIMARY KEY, kino_nomi TEXT, tavsif TEXT, reyting REAL, media_type TEXT, media_file_id TEXT, qismlar_soni INTEGER, janr TEXT, qoshilgan_sana TEXT, korishlar INTEGER DEFAULT 0)")
+cursor.execute("CREATE TABLE IF NOT EXISTS qismlar (id INTEGER PRIMARY KEY AUTOINCREMENT, kino_kod INTEGER, qism_raqami INTEGER, video_file_id TEXT)")
+cursor.execute("CREATE TABLE IF NOT EXISTS pro_users (user_id INTEGER PRIMARY KEY, pro_until TEXT)")
+cursor.execute("CREATE TABLE IF NOT EXISTS reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, kino_kod INTEGER, user_id INTEGER, username TEXT, matn TEXT, sana TEXT)")
+cursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, first_name TEXT, username TEXT, joined_date TEXT)")
+cursor.execute("CREATE TABLE IF NOT EXISTS ratings (id INTEGER PRIMARY KEY AUTOINCREMENT, kino_kod INTEGER, user_id INTEGER, rating INTEGER)")
 conn.commit()
 
 user_states = {}
@@ -82,8 +39,7 @@ def is_pro(uid):
 def add_user(uid, first_name, username):
     cursor.execute("SELECT user_id FROM users WHERE user_id=?", (uid,))
     if not cursor.fetchone():
-        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?)",
-                      (uid, first_name, username, datetime.now().strftime("%Y-%m-%d %H:%M")))
+        cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?)", (uid, first_name, username, datetime.now().strftime("%Y-%m-%d %H:%M")))
         conn.commit()
 
 def send_to_channel(kino):
@@ -104,7 +60,7 @@ def start(msg):
     
     if not check_sub(uid):
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton("📢 Kanalga obuna bo'lish", url=f"https://t.me/{CHANNEL_USERNAME[1:]}"))
+        markup.add(types.InlineKeyboardButton("📢 Kanalga obuna bo'lish", url="https://t.me/" + CHANNEL_USERNAME[1:]))
         markup.add(types.InlineKeyboardButton("✅ Tekshirish", callback_data="check_sub"))
         bot.send_message(uid, "👋 Salom!\n\n" + CHANNEL_USERNAME + " kanaliga obuna bo'ling.", reply_markup=markup)
         return
@@ -147,6 +103,7 @@ def admin(msg):
     markup.add("⬅️ Oddiy menyu")
     bot.send_message(uid, "👑 Admin Panel", reply_markup=markup)
 
+# KINO QO'SHISH
 @bot.message_handler(func=lambda m: m.text == "🎬 Kino qo'shish" and m.from_user.id == ADMIN_ID)
 def add_kino(msg):
     uid = msg.from_user.id
@@ -193,8 +150,7 @@ def step_reyting(msg):
     user_states[uid]['step'] = 'media'
     bot.send_message(uid, "Rasm yoki video yuboring:")
 
-@bot.message_handler(func=lambda m: m.from_user.id == ADMIN_ID and user_states.get(m.from_user.id, {}).get('step') == 'media',
-                     content_types=['photo', 'video', 'text'])
+@bot.message_handler(func=lambda m: m.from_user.id == ADMIN_ID and user_states.get(m.from_user.id, {}).get('step') == 'media', content_types=['photo', 'video', 'text'])
 def step_media(msg):
     uid = msg.from_user.id
     if msg.text and msg.text == '/cancel': cancel(msg); return
@@ -225,8 +181,7 @@ def step_janr(msg):
     if msg.text == '/cancel': cancel(msg); return
     d = user_states[uid]['data']
     sana = datetime.now().strftime("%Y-%m-%d %H:%M")
-    cursor.execute('''INSERT INTO kinolar VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                   (d['kod'], d['nomi'], d['tavsif'], d['reyting'], d['media_type'], d['file_id'], d['qismlar'], msg.text, sana, 0))
+    cursor.execute("INSERT INTO kinolar VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (d['kod'], d['nomi'], d['tavsif'], d['reyting'], d['media_type'], d['file_id'], d['qismlar'], msg.text, sana, 0))
     conn.commit()
     kino = (d['kod'], d['nomi'], d['tavsif'], d['reyting'], d['media_type'], d['file_id'], d['qismlar'], msg.text)
     send_to_channel(kino)
@@ -234,6 +189,7 @@ def step_janr(msg):
     user_states.pop(uid, None)
     admin(msg)
 
+# QISM QO'SHISH
 @bot.message_handler(func=lambda m: m.text == "📹 Qism qo'shish" and m.from_user.id == ADMIN_ID)
 def add_qism(msg):
     uid = msg.from_user.id
@@ -268,21 +224,20 @@ def step_qraqam(msg):
     user_states[uid]['step'] = 'qvideo'
     bot.send_message(uid, str(q) + "-qism videosini yuboring:")
 
-@bot.message_handler(func=lambda m: m.from_user.id == ADMIN_ID and user_states.get(m.from_user.id, {}).get('step') == 'qvideo',
-                     content_types=['video', 'text'])
+@bot.message_handler(func=lambda m: m.from_user.id == ADMIN_ID and user_states.get(m.from_user.id, {}).get('step') == 'qvideo', content_types=['video', 'text'])
 def step_qvideo(msg):
     uid = msg.from_user.id
     if msg.text and msg.text == '/cancel': cancel(msg); return
     if not msg.video:
         bot.send_message(uid, "Video yuboring!"); return
     d = user_states[uid]['data']
-    cursor.execute("INSERT INTO qismlar (kino_kod, qism_raqami, video_file_id) VALUES (?, ?, ?)",
-                   (d['kod'], d['qism'], msg.video.file_id))
+    cursor.execute("INSERT INTO qismlar (kino_kod, qism_raqami, video_file_id) VALUES (?, ?, ?)", (d['kod'], d['qism'], msg.video.file_id))
     conn.commit()
     bot.send_message(uid, "✅ " + str(d['qism']) + "-qism qo'shildi!")
     user_states.pop(uid, None)
     admin(msg)
 
+# QIDIRISH
 @bot.callback_query_handler(func=lambda c: c.data == "search_code")
 def search_code(call):
     uid = call.from_user.id
@@ -382,8 +337,7 @@ def save_review(msg):
     if msg.text == '/cancel': user_states.pop(uid, None); show_menu(uid); return
     kod = user_states[uid]['kod']
     username = "@" + msg.from_user.username if msg.from_user.username else msg.from_user.first_name
-    cursor.execute("INSERT INTO reviews (kino_kod, user_id, username, matn, sana) VALUES (?, ?, ?, ?, ?)",
-                   (kod, uid, username, msg.text, datetime.now().strftime("%Y-%m-%d %H:%M")))
+    cursor.execute("INSERT INTO reviews (kino_kod, user_id, username, matn, sana) VALUES (?, ?, ?, ?, ?)", (kod, uid, username, msg.text, datetime.now().strftime("%Y-%m-%d %H:%M")))
     conn.commit()
     bot.send_message(uid, "✅ Fikringiz qabul qilindi!")
     user_states.pop(uid, None)
@@ -461,4 +415,9 @@ def top_rating(call):
     bot.edit_message_text(text, uid, call.message.message_id, reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda c: c.data == "top_views")
-de
+def top_views(call):
+    uid = call.from_user.id
+    if not check_sub(uid):
+        bot.answer_callback_query(call.id, "❌ Obuna bo'ling!", show_alert=True); return
+    cursor.execute("SELECT * FROM kinolar ORDER BY korishlar DESC LIMIT 10")
+    kinolar = cursor.fetch
