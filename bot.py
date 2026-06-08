@@ -25,7 +25,7 @@ def run_flask():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', 'TOKEN')
 ADMIN_ID = 8306639956
 CHANNEL = '@Vexron_stars'
 PRO_PRICE = "14.000 som"
@@ -50,8 +50,7 @@ class DB:
             json.dump(self.d, f, ensure_ascii=False)
     
     def add_movie(self, code, name, desc, genre, parts, photo=None):
-        code = str(code)
-        self.d["movies"][code] = {
+        self.d["movies"][str(code)] = {
             "name": name, "desc": desc, "genre": genre,
             "parts_count": int(parts), "parts": {},
             "rating": 0, "views": 0, "photo": photo,
@@ -60,17 +59,15 @@ class DB:
         self.save()
     
     def delete_movie(self, code):
-        code = str(code)
-        if code in self.d["movies"]:
-            del self.d["movies"][code]
+        if str(code) in self.d["movies"]:
+            del self.d["movies"][str(code)]
             self.save()
             return True
         return False
     
     def add_part(self, code, part_num, video_id):
-        code = str(code)
-        if code in self.d["movies"]:
-            self.d["movies"][code]["parts"][str(part_num)] = video_id
+        if str(code) in self.d["movies"]:
+            self.d["movies"][str(code)]["parts"][str(part_num)] = video_id
             self.save()
     
     def get_movie(self, code):
@@ -102,30 +99,26 @@ class DB:
         return sorted(movies, key=lambda x: x["views"], reverse=True)[:limit]
     
     def add_view(self, code):
-        code = str(code)
-        if code in self.d["movies"]:
-            self.d["movies"][code]["views"] += 1
+        if str(code) in self.d["movies"]:
+            self.d["movies"][str(code)]["views"] += 1
             self.save()
     
     def add_rating(self, code, user_id, stars):
-        code = str(code)
-        user_id = str(user_id)
-        self.d.setdefault("ratings", {}).setdefault(code, {})[user_id] = stars
-        ratings = list(self.d["ratings"][code].values())
-        self.d["movies"][code]["rating"] = round(sum(ratings) / len(ratings), 1)
+        self.d.setdefault("ratings", {}).setdefault(str(code), {})[str(user_id)] = stars
+        ratings = list(self.d["ratings"][str(code)].values())
+        self.d["movies"][str(code)]["rating"] = round(sum(ratings) / len(ratings), 1)
         self.save()
     
     def get_user_rating(self, code, user_id):
         return self.d.get("ratings", {}).get(str(code), {}).get(str(user_id))
     
     def add_comment(self, code, user_id, name, text):
-        code = str(code)
-        self.d.setdefault("comments", {}).setdefault(code, [])
-        self.d["comments"][code].append({
+        self.d.setdefault("comments", {}).setdefault(str(code), [])
+        self.d["comments"][str(code)].append({
             "user_id": str(user_id), "name": name, "text": text,
             "date": datetime.now().strftime("%Y-%m-%d %H:%M")
         })
-        self.d["comments"][code] = self.d["comments"][code][-50:]
+        self.d["comments"][str(code)] = self.d["comments"][str(code)][-50:]
         self.save()
     
     def get_comments(self, code, limit=10):
@@ -135,9 +128,8 @@ class DB:
         return str(uid) in self.d.get("pro", [])
     
     def add_pro(self, uid):
-        uid = str(uid)
-        if uid not in self.d.get("pro", []):
-            self.d.setdefault("pro", []).append(uid)
+        if str(uid) not in self.d.get("pro", []):
+            self.d.setdefault("pro", []).append(str(uid))
             self.save()
             return True
         return False
@@ -471,7 +463,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif d == "stats":
         s = db.get_stats()
         text = f"📊 Statistika\n\n👥 {s['users']} | 🎬 {s['movies']} | 👁 {s['views']}\n💎 {s['pro']} | 💬 {s['comments']}"
-        kb = [[InlineKeyboardButton("🔙 Orqaga", callback_data="main")]]
+                kb = [[InlineKeyboardButton("🔙 Orqaga", callback_data="main")]]
         await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     elif d.startswith("mv_"):
         code = d.replace("mv_", "")
@@ -524,16 +516,26 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
+    
     if uid == ADMIN_ID:
-        await handle_admin_photo(update, context)
+        if context.user_data.get('add_movie') and context.user_data.get('m_step') == 'photo':
+            await handle_admin_photo(update, context)
         return
+    
     if context.user_data.get('buying_pro'):
         photo = update.message.photo[-1]
-        kb = [[InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"app_{uid}"), InlineKeyboardButton("❌ Bekor", callback_data=f"rej_{uid}")]]
-        await context.bot.send_photo(ADMIN_ID, photo.file_id, caption=f"📩 PRO so'rovi\n👤 {update.effective_user.first_name}\n🆔 {uid}\n💰 {PRO_PRICE}", reply_markup=InlineKeyboardMarkup(kb))
+        kb = [[InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"app_{uid}"), 
+               InlineKeyboardButton("❌ Bekor", callback_data=f"rej_{uid}")]]
+        await context.bot.send_photo(
+            ADMIN_ID, 
+            photo.file_id, 
+            caption=f"📩 PRO so'rovi\n👤 {update.effective_user.first_name}\n🆔 {uid}\n💰 {PRO_PRICE}",
+            reply_markup=InlineKeyboardMarkup(kb)
+        )
         db.add_payment(uid, update.effective_user.first_name)
         await update.message.reply_text("✅ Chek yuborildi! Admin tasdiqlaydi.")
         context.user_data['buying_pro'] = False
+        return
 
 async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
