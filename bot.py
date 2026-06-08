@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "🎬 NexMovie Pro Max"
+    return "NexMovie Pro Max"
 
 @app.route('/ping')
 def ping():
@@ -25,7 +25,7 @@ def run_flask():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', 'TOKEN')
 ADMIN_ID = 8306639956
 CHANNEL = '@Vexron_stars'
 PRO_PRICE = "14.000 som"
@@ -452,7 +452,7 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
     elif d == "pro_buy":
         context.user_data['buying_pro'] = True
-        text = f"👑 NexMovie Pro\n\n💰 Narxi: {PRO_PRICE}\n💳 Karta: <code>{CARD}</code>\n\n📸 To'lov qilib, <b>chek rasmini</b> shu yerga yuboring!"
+        text = f"👑 <b>NexMovie PRO</b>\n\n💳 <b>Ushbu kartaga to'lov qiling:</b>\n<code>{CARD}</code>\n\n💰 Narxi: <b>{PRO_PRICE}</b>\n\n📸 To'lov qilganingizdan so'ng <b>chek rasmini</b> shu yerga yuboring!"
         await q.edit_message_text(text, parse_mode='HTML')
     elif d == "pro_ok":
         await q.answer("💎 Siz PRO foydalanuvchisisiz!", show_alert=True)
@@ -471,10 +471,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if context.user_data.get('buying_pro'):
         photo = update.message.photo[-1]
-        kb = [[InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"app_{uid}"), InlineKeyboardButton("❌ Bekor", callback_data=f"rej_{uid}")]]
-        await context.bot.send_photo(ADMIN_ID, photo.file_id, caption=f"📩 PRO so'rovi\n👤 {update.effective_user.first_name}\n🆔 <code>{uid}</code>\n💰 {PRO_PRICE}", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
+        kb = [[InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"app_{uid}"), InlineKeyboardButton("❌ Bekor qilish", callback_data=f"rej_{uid}")]]
+        await context.bot.send_photo(ADMIN_ID, photo.file_id, caption=f"📩 <b>PRO so'rovi</b>\n\n👤 Foydalanuvchi: {update.effective_user.first_name}\n🆔 ID: <code>{uid}</code>\n💰 Narxi: {PRO_PRICE}\n\n<b>Tasdiqlaysizmi?</b>", reply_markup=InlineKeyboardMarkup(kb), parse_mode='HTML')
         db.add_payment(uid, update.effective_user.first_name)
-        await update.message.reply_text("✅ Chek yuborildi! Admin tasdiqlaydi.\n\n<i>Tez orada PRO aktivlashtiriladi</i>", parse_mode='HTML')
+        await update.message.reply_text("✅ <b>Chek yuborildi!</b>\n\nAdmin tekshirib, PRO aktivlashtiradi.\n<i>Bu biroz vaqt olishi mumkin.</i>", parse_mode='HTML')
         context.user_data['buying_pro'] = False
         return
 
@@ -488,19 +488,17 @@ async def admin_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target = d.replace("app_", "")
         if db.add_pro(target):
             try:
-                await context.bot.send_message(int(target), "🎉 Tabriklaymiz! PRO aktivlashtirildi!\n\n/start bosib tekshiring.")
+                await context.bot.send_message(int(target), "🎉 <b>Tabriklaymiz!</b>\n\nPRO aktivlashtirildi!\n/start bosib tekshiring.", parse_mode='HTML')
             except:
                 pass
-            await q.edit_message_caption(caption=f"{q.message.caption}\n\n✅ TASDIQLANDI!")
-        else:
-            await q.answer("Allaqachon PRO!", show_alert=True)
+            await q.edit_message_caption(caption=f"{q.message.caption}\n\n✅ <b>TASDIQLANDI!</b>", parse_mode='HTML')
     elif d.startswith("rej_"):
         target = d.replace("rej_", "")
         try:
-            await context.bot.send_message(int(target), "❌ To'lov rad etildi. Qaytadan urinib ko'ring.")
+            await context.bot.send_message(int(target), "❌ <b>To'lov rad etildi.</b>\n\nQaytadan urinib ko'ring.", parse_mode='HTML')
         except:
             pass
-        await q.edit_message_caption(caption=f"{q.message.caption}\n\n❌ RAD ETILDI!")
+        await q.edit_message_caption(caption=f"{q.message.caption}\n\n❌ <b>RAD ETILDI!</b>", parse_mode='HTML')
 
 def main():
     Thread(target=run_flask).start()
