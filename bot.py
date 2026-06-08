@@ -25,8 +25,8 @@ def run_flask():
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.environ.get('BOT_TOKEN', 'TOKEN')
-ADMIN_ID = 6242470602
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8901775007:AAHzy1X8D2F0PQjwrjUJRWzTskWZYVhjAxE')
+ADMIN_ID = 8306639956
 CHANNEL = '@Vexron_stars'
 PRO_PRICE = "14.000 som"
 CARD = "4916 9903 1619 3280"
@@ -470,7 +470,8 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await show_movie(update, code, movie, uid)
     elif d.startswith("rt_"):
         parts = d.split("_")
-        code, stars = parts[1], int(parts[2])
+        code = parts[1]
+        stars = int(parts[2])
         db.add_rating(code, uid, stars)
         await q.answer(f"⭐ {stars} baholandi!")
         movie = db.get_movie(code)
@@ -561,3 +562,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+      
