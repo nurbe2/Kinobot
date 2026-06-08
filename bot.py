@@ -437,4 +437,4 @@ def pro_menu(call):
 @bot.callback_query_handler(func=lambda c: c.data == "pay")
 def pay(call):
     states[call.from_user.id] = {'step': 'check'}
-    bot.answer_callback_query(call.
+    bot.answer_callback_query(call.id, "OK")
